@@ -79,6 +79,13 @@
         text-align: center;
         color:white;
       }
+      #v_count {
+        display: inline-block;
+        padding: 3px;
+        background: rgb(210,90,90);
+        color:white;
+        border-radius: 5px;
+      }
 
       body {
         margin: 0;
@@ -106,6 +113,14 @@
         display: inline-block;
         margin-bottom: 5px;
       }
+      .top_info {
+        width: 180px;
+        margin: 0px auto;
+        padding-top:10px;
+        text-align: center;
+        color:black;
+        font-size: 20px;
+      }
 
     </style>
   </head>
@@ -113,8 +128,10 @@
   
   <div id="nav">
        <h2>Who Gets to the Top?</h2>
+       <div class="top_info">共有 <span id="qCount">...</span> 個問題</div>
   </div>
   <div id="content">
+    
     <div id="setting">
         <div class="setting_item">
           寬度：<input type="text" value="1000" name="width"></input>
@@ -143,16 +160,16 @@
         <div class="setting_item">
         <select id="category_select">
            <option value=""></option>
-           <option value="居住">居住</option>
-           <option value="環境">環境</option>
-           <option value="人權">人權</option>
-           <option value="制度改革">制度改革</option>
-           <option value="教育">教育</option>
-           <option value="國防/兩岸">國防/兩岸</option>
-           <option value="勞工">勞工</option>
-           <option value="經濟/財稅">經濟/財稅</option>
-           <option value="社會/醫療">社會/醫療</option>
-           <option value="其他">其他</option>
+           <option value="0">居住</option>
+           <option value="1">環境</option>
+           <option value="2">人權</option>
+           <option value="3">制度改革</option>
+           <option value="4">教育</option>
+           <option value="5">國防/兩岸</option>
+           <option value="6">勞工</option>
+           <option value="7">經濟/財稅</option>
+           <option value="8">社會/醫療</option>
+           <option value="9">其他</option>
         </select>
         </div>
         
@@ -163,6 +180,7 @@
     <div id="chart"></div>
     <div id="legend"></div>
     <div id="tooltip" class="hidden">
+      <div id="v_count"></div>
       <p id="value">Label Heading</p>
     </div>
   </div>
@@ -194,10 +212,11 @@
   "group_category":["交通運輸","基礎建設","通訊","其他"]}
 ];
     var city = "taipei";
-    var db = "https://asktest.firebaseio.com/";
+    var db = "https://askkkkk.firebaseio.com/";
 
     var parsedCategories = {};
     var categoryTitles = [];
+    
 
     var parseCategory = function(){
         for(var i in categories){
@@ -234,6 +253,7 @@
              dataset.push(snap_obj[key]);
           }
       }
+      $("#qCount").text(dataset.length);
       defaultDraw();
 
     });
@@ -256,7 +276,7 @@
       city = $("#city_select").val();
       console.log(city);
       if(city === 'taipei'){
-        db = "https://asktest.firebaseio.com/";
+        db = "https://askkkkk.firebaseio.com/";
       }else{
         db = "https://askkk-taichung.firebaseio.com/";
       }
@@ -284,8 +304,6 @@
       
           var snap_obj = snap.exportVal();
           
-          
-
           for(var key in snap_obj){
               if(snap_obj[key].signatures_count && snap_obj[key].post_timestamp){
                  snap_obj[key].qid = key;
@@ -299,21 +317,28 @@
                     if(snap_obj[key].post_timestamp > endTimestamp)
                        should_includ = false;
                  }
-                 console.log("顯示分類:"+selectedCat);
-                 if(selectedCat){
-                    console.log("c"+snap_obj[key].categories);
-                    console.log((snap_obj[key].categories[0] !== selectedCat));
-                    if(snap_obj[key].categories[0] !== selectedCat)
-                       should_includ = false;
 
+                 if(selectedCat){
+                    if(snap_obj[key].category){
+                       var catName = snap_obj[key].category[0];
+
+                       if(parsedCategories[catName]!== selectedCat)
+                          should_includ = false;
+
+                    }else{
+                       should_includ = false;
+                    }
+                    
                  }
 
 
                  if(should_includ)
-                   dataset.push(snap_obj[key]);
+                    dataset.push(snap_obj[key]);
                  
               }
           }
+          $("#qCount").text(dataset.length);
+
 
           if(new_w && new_h && $.isNumeric(new_w) && $.isNumeric(new_h)){//both valid
             draw(new_w,new_h);
@@ -364,8 +389,6 @@
             return "black";
           }
              
-        
-
       };
 
       var xAxis = d3.svg.axis()
@@ -404,6 +427,10 @@
                .style("top",(yPosition+40+cr*2)+"px")
                .select("#value")
                .text(d.title);
+             d3.select("#v_count")
+               .text(d.signatures_count);
+             
+            
              d3.select("#tooltip")
                .classed("hidden",false);
 
