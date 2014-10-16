@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Who Gets to the Top? Askkk's Next Top Question.</title>
+    <script src="//d3js.org/d3.v3.min.js"></script>
+    <script src="//cdn.firebase.com/v0/firebase.js"></script>
+    <script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+    <!-- jQuery datepicker-->
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.11.1/themes/smoothness/jquery-ui.css">
+    <script src="//code.jquery.com/ui/1.11.1/jquery-ui.js"></script>
+    <style>
+      .axis path,
+      .axis line {
+        fill:none;
+        stroke: black;
+        shape-rendering: crispEdges;
+      }
+      .axis text {
+        font-family: sans-serif;
+        font-size: 11px;
+      }
+      #tooltip {
+        position: absolute;
+        width: 200px;
+        height: auto;
+        padding: 10px;
+        background-color: white;
+        -webkit-border-radius: 10px;
+        -moz-border-radius: 10px;
+        border-radius: 10px;
+        /*
+        -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+        */
+        border: 3px solid black;
+        pointer-events: none;
+      }
+      #tooltip.hidden {
+        display: none;
+      }
+      #tooltip p {
+        margin: 0;
+        font-family: sans-serif;
+        font-size: 16px;
+        line-height: 20px;
+      }
+      circle {
+        cursor: pointer;
+      }
+
+      #chart, #legend {
+        width: 1000px;
+        margin: 0 auto;
+      }
+      #content {
+        margin-top: 60px;   
+      }
+      #setting {
+        width: 100px;
+        float:left;
+        margin: 10px;
+        margin-top: 20px;
+        display: inline-block;
+      }
+
+      @media screen and (max-width:1000px){
+        #chart, #legend {
+          width: 100%;
+        }
+      }
+      #nav {
+        width: 100%;
+        position: fixed;
+        top:0;
+        background: black;
+        height: 60px;
+        text-align: center;
+        color:white;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .link, .link:visited {
+        color: rgb(53,55,53);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .link:hover {
+        color: teal;
+      }
+      select{
+        width: 100px;
+      }
+      button {
+        display: block;
+        width: 100px;
+        height: 30px;
+        margin-top: 20px;
+      }
+      .setting_item {
+        display: inline-block;
+        margin-bottom: 5px;
+      }
+
+    </style>
+  </head>
+  <body>
+  
+  <div id="nav">
+       <h2>Who Gets to the Top?</h2>
+  </div>
+  <div id="content">
+    <div id="setting">
+        <div class="setting_item">
+          寬度：<input type="text" value="1000" name="width"></input>
+        </div>
+        <div class="setting_item">
+          高度：<input type="text" value="500" name="height"></input>
+        </div>
+        <div class="setting_item">
+        <select id="city_select">
+           <option value="taipei">台北</option>
+           <option value="taichung">台中</option>
+        </select>
+        </div>
+
+        <div class="setting_item">
+        起始日期：<input type="text" id="datepicker_start">
+        </div>
+        <div class="setting_item">
+        結束日期：<input type="text" id="datepicker_end">
+        </div>
+
+        <div class="setting_item">
+        Y軸 Max：<input type="text" name="maxVote"></input>
+        </div>
+
+        <div class="setting_item">
+        <select id="category_select">
+           <option value=""></option>
+           <option value="居住">居住</option>
+           <option value="環境">環境</option>
+           <option value="人權">人權</option>
+           <option value="制度改革">制度改革</option>
+           <option value="教育">教育</option>
+           <option value="國防/兩岸">國防/兩岸</option>
+           <option value="勞工">勞工</option>
+           <option value="經濟/財稅">經濟/財稅</option>
+           <option value="社會/醫療">社會/醫療</option>
+           <option value="其他">其他</option>
+        </select>
+        </div>
+        
+        <button onclick="customSize()">GO!</button>
+
+    </div>
+
+    <div id="chart"></div>
+    <div id="legend"></div>
+    <div id="tooltip" class="hidden">
+      <p id="value">Label Heading</p>
+    </div>
+  </div>
+  <script>
+  $( "#datepicker_start" ).datepicker();
+  $( "#datepicker_end" ).datepicker();
+
+  var categories = 
+[
+{"group_name":"居住",
+  "group_category":["居住","社會住宅","都市更新","土地"]},
+{"group_name":"環境",
+  "group_category":["環境","國土安全和賑災","自然資源","核能","能源","氣候變化","農業","土地"]},
+{"group_name":"人權",
+  "group_category":["人權","公民權利和自由","婦女","家庭","性別","移民","消費者保護","刑事司法和執法"]},
+{"group_name":"制度改革",
+  "group_category":["制度改革","開放政府","創新"]},
+{"group_name":"教育",
+  "group_category":["教育","科學與技術"]},
+{"group_name":"國防/兩岸",
+  "group_category":["國防","外交政策","兩岸"]},
+{"group_name":"勞工",
+ "group_category":["勞工"]},
+{"group_name":"經濟/財稅",
+  "group_category":["經濟","創造就業機會","預算和稅收"]},
+{"group_name":"社會/醫療",
+  "group_category":["社會保障","醫療","身心障礙","老年人照顧","藝術與人文","運動休閒","貧窮"]},
+{"group_name":"其他",
+  "group_category":["交通運輸","基礎建設","通訊","其他"]}
+];
+    var city = "taipei";
+    var db = "https://asktest.firebaseio.com/";
+
+    var parsedCategories = {};
+    var categoryTitles = [];
+
+    var parseCategory = function(){
+        for(var i in categories){
+          //console.log(categories[i].group_category);
+          categoryTitles.push(categories[i].group_name);
+          for(var j in categories[i].group_category){
+              var name = categories[i].group_category[j];
+              parsedCategories[name] = i;
+          }
+        }
+        console.log("# of categories:"+categories.length);
+        parsedCategories.size = categories.length;
+        console.log(categoryTitles);
+        console.log(parsedCategories);
+
+    };
+    //color
+    var palette = ['rgb(166,206,227)','rgb(31,120,180)','rgb(178,223,138)','rgb(51,160,44)','rgb(251,154,153)','rgb(227,26,28)','rgb(253,191,111)','rgb(255,127,0)','rgb(202,178,214)','rgb(106,61,154)'];//['rgb(158,1,66)','rgb(213,62,79)','rgb(244,109,67)','rgb(253,174,97)','rgb(254,224,139)','rgb(230,245,152)','rgb(171,221,164)','rgb(102,194,165)','rgb(50,136,189)','rgb(94,79,162)'];
+
+    var dataset = [];
+    var chart = {};
+    console.log("Hello! Let me draw for you.");
+    parseCategory();
+
+
+
+    var firebase = new Firebase(db);
+    firebase.child('questions').once('value', function (snap) {
+      
+      var snap_obj = snap.exportVal();
+      for(var key in snap_obj){
+          if(snap_obj[key].signatures_count && snap_obj[key].post_timestamp){
+             snap_obj[key].qid = key;
+             dataset.push(snap_obj[key]);
+          }
+      }
+      defaultDraw();
+
+    });
+
+    $( window ).resize(function() {
+       defaultDraw();
+    });
+
+    function defaultDraw(){
+      var window_width = Math.min(1000,$(window).width());
+      draw(window_width,600);
+    }
+
+    var startTimestamp, endTimestamp, maxY;
+
+
+    function customSize(){
+      var new_w = $("input[name=width]").val();
+      var new_h = $("input[name=height]").val();
+      city = $("#city_select").val();
+      console.log(city);
+      if(city === 'taipei'){
+        db = "https://asktest.firebaseio.com/";
+      }else{
+        db = "https://askkk-taichung.firebaseio.com/";
+      }
+      
+      var o_s = $("#datepicker_start").val();
+      var o_e = $("#datepicker_end").val();
+
+      startTimestamp = $("#datepicker_start")
+      .datepicker("option", "dateFormat", "@").val();
+      endTimestamp = $("#datepicker_end")
+      .datepicker("option", "dateFormat", "@").val();
+
+      $("#datepicker_start").val(o_s);
+      $("#datepicker_end").val(o_e);
+
+      maxY = $("input[name=maxVote]").val();
+      
+      var selectedCat = $("#category_select").val();
+      
+
+      dataset = [];
+      chart = {};
+      var firebase = new Firebase(db);
+      firebase.child('questions').once('value', function (snap) {
+      
+          var snap_obj = snap.exportVal();
+          
+          
+
+          for(var key in snap_obj){
+              if(snap_obj[key].signatures_count && snap_obj[key].post_timestamp){
+                 snap_obj[key].qid = key;
+                 
+                 var should_includ = true;
+                 if(startTimestamp){
+                    if(snap_obj[key].post_timestamp < startTimestamp)
+                       should_includ = false;
+                 }
+                 if(endTimestamp){
+                    if(snap_obj[key].post_timestamp > endTimestamp)
+                       should_includ = false;
+                 }
+                 console.log("顯示分類:"+selectedCat);
+                 if(selectedCat){
+                    console.log("c"+snap_obj[key].categories);
+                    console.log((snap_obj[key].categories[0] !== selectedCat));
+                    if(snap_obj[key].categories[0] !== selectedCat)
+                       should_includ = false;
+
+                 }
+
+
+                 if(should_includ)
+                   dataset.push(snap_obj[key]);
+                 
+              }
+          }
+
+          if(new_w && new_h && $.isNumeric(new_w) && $.isNumeric(new_h)){//both valid
+            draw(new_w,new_h);
+          
+          }else{
+            defaultDraw();
+            $("input[name=width]").val(Math.min(1000,$(window).width()));
+            $("input[name=height]").val(600);
+          }   
+      });
+
+    };
+
+    function draw(_w,_h){
+      
+      var w = _w,
+          h = _h,
+          circle_r = Math.min(10,w/100),
+          padding = 50;
+
+      console.log("Drawing..., width:"+w);
+
+      //Remove all svg
+      $("svg").remove();
+
+      //Create SVG element
+      var svg = d3.select("#chart")
+                  .append("svg")
+                  .attr("width",w)
+                  .attr("height",h);
+
+      var xScale = d3.time.scale()
+                           .domain([d3.min(dataset,function(d){return d.post_timestamp}),d3.max(dataset,function(d){return d.post_timestamp})])
+                           .range([0+padding,w-padding]);
+
+      var yMax = maxY || d3.max(dataset,function(d){return d.signatures_count});
+      var yScale = d3.scale.linear()
+                           .domain([d3.min(dataset,function(d){return d.signatures_count}),yMax])
+                           .range([h-padding,0+padding]);
+
+      //var color = d3.scale.category20();
+      var color = function(d,i){
+          if(d.category){
+            var group_num = parsedCategories[d.category[0]];
+            return palette[group_num];
+
+          }else{
+            return "black";
+          }
+             
+        
+
+      };
+
+      var xAxis = d3.svg.axis()
+                        .scale(xScale)
+                        .orient("bottom");
+                        //.ticks(10);
+
+      var yAxis = d3.svg.axis()
+                        .scale(yScale)
+                        .orient("left");
+
+      svg.selectAll("circle")
+         .data(dataset)
+         .enter()
+         .append("circle")
+         .attr({
+                cx: function(d,i) { return xScale(d.post_timestamp); },
+                cy: function(d,i) { return yScale(d.signatures_count); },
+                r: circle_r,
+                stroke: "rgb(150,150,150)",
+                "stroke-width": 1,
+                fill: function(d,i) { return color(d,i); },
+                opacity: 0.9,
+                data:function(d){return d.title;},
+                color:function(d,i) { return color(d,i); }
+          })
+         .on("mouseover",function(d){
+             
+             //console.log("mouseover:"+d3.select(this).attr("cx"));
+             var xPosition = parseFloat(d3.select(this).attr("cx"));
+             var yPosition = parseFloat(d3.select(this).attr("cy"));
+             var cr = parseFloat(d3.select(this).attr("r"));
+
+             d3.select("#tooltip")
+               .style("left",xPosition+200+"px")
+               .style("top",(yPosition+40+cr*2)+"px")
+               .select("#value")
+               .text(d.title);
+             d3.select("#tooltip")
+               .classed("hidden",false);
+
+
+             chart._tooltipGroup = svg.append("g");
+
+             chart._tooltipGroup.append("circle")
+
+               .attr({
+                   cx: xPosition,
+                   cy: yPosition,
+                   fill:"none",
+                   r: 2,
+                   stroke: d3.select(this).attr("color"),
+                   "stroke-width": 2
+
+                })
+               .transition()
+               .duration(750)
+               .attr({
+                   r: circle_r + 5,
+                });
+
+         })
+         .on("mouseout",function(){
+
+             d3.select("#tooltip")
+               .classed("hidden",true);
+
+             d3.select(this)
+               .transition()
+               .duration(250)
+               .attr({
+                   r: circle_r,
+                   stroke: "rgb(150,150,150)",
+                   "stroke-width": 1,
+                   fill: d3.select(this).attr("color")
+                });
+             chart._tooltipGroup.remove();
+         })
+         .on("click",function(d){
+            console.log("click!"+d.qid+":"+d.title);
+            window.open("//"+city+".wethepeople.tw/#!/question/"+d.qid);
+         });
+
+      svg.append("g")
+         .attr("class","axis")
+         .attr("transform","translate(0,"+(h-padding)+")")
+         .call(xAxis);
+
+      svg.append("g")
+         .attr("class","axis")
+         .attr("transform","translate("+padding+",0)")
+         .call(yAxis);
+
+
+      
+      var legend = d3.select("#legend")
+                     .append("svg")
+                     .attr("width",w)
+                     .attr("height",80);
+
+      legend.selectAll('rect')
+         .data(categoryTitles)
+         .enter()
+         .append("rect")
+         .attr({
+                x: function(d,i) {return padding+i*80; },
+                y: 0,
+                text: function(d,i) {return d; },
+                width:80,
+                height:20,
+                fill: function(d,i) { return palette[i]; },
+                opacity: 0.9,
+                color:function(d,i) { return "black"; },
+                class: "legend"
+          });
+      
+      legend.selectAll('text')
+         .data(categoryTitles)
+         .enter()
+         .append("text")
+         .attr("text-anchor", "middle")
+         .attr({
+                x: function(d,i) {return padding+i*80+40; },
+                y: 40,
+                width:80,
+                class:'legend_text'
+          })
+         .text(function(d,i){return d;});
+      /*
+      svg.selectAll("text")
+         .data(dataset)
+         .enter()
+         .append("text")
+         .attr({
+                x: function(d,i) { return xScale(d.post_timestamp); },
+                y: function(d,i) { return yScale(d.signatures_count); },
+                fill: function(d,i) { return color(d,i); }
+          })
+         .text(function(d,i){return d.signatures_count;});
+      */
+      
+    }
+    
+  </script>
+
+  </body>
+</html>
