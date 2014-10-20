@@ -55,7 +55,7 @@
         margin: 0 auto;
       }
       #content {
-        margin-top: 60px;   
+        margin-top: 60px;
       }
       #setting {
         width: 100px;
@@ -114,7 +114,7 @@
         margin-bottom: 5px;
       }
       .top_info {
-        width: 180px;
+        width: 500px;
         margin: 0px auto;
         padding-top:10px;
         text-align: center;
@@ -125,13 +125,13 @@
     </style>
   </head>
   <body>
-  
+
   <div id="nav">
        <h2>Who Gets to the Top?</h2>
-       <div class="top_info">共有 <span id="qCount">...</span> 個問題</div>
+       <div class="top_info">共有 <span id="qCount">...</span> 個問題，<span id="passedCount">...</span> 個已達門檻，<span id="endedCount">...</span> 已截止連署。</div>
   </div>
   <div id="content">
-    
+
     <div id="setting">
         <div class="setting_item">
           寬度：<input type="text" value="1000" name="width"></input>
@@ -172,7 +172,7 @@
            <option value="9">其他</option>
         </select>
         </div>
-        
+
         <button onclick="customSize()">GO!</button>
 
     </div>
@@ -188,7 +188,7 @@
   $( "#datepicker_start" ).datepicker();
   $( "#datepicker_end" ).datepicker();
 
-  var categories = 
+  var categories =
 [
 {"group_name":"居住",
   "group_category":["居住","社會住宅","都市更新","土地"]},
@@ -216,7 +216,7 @@
 
     var parsedCategories = {};
     var categoryTitles = [];
-    
+
 
     var parseCategory = function(){
         for(var i in categories){
@@ -237,6 +237,9 @@
     var palette = ['rgb(166,206,227)','rgb(31,120,180)','rgb(178,223,138)','rgb(51,160,44)','rgb(251,154,153)','rgb(227,26,28)','rgb(253,191,111)','rgb(255,127,0)','rgb(202,178,214)','rgb(106,61,154)'];//['rgb(158,1,66)','rgb(213,62,79)','rgb(244,109,67)','rgb(253,174,97)','rgb(254,224,139)','rgb(230,245,152)','rgb(171,221,164)','rgb(102,194,165)','rgb(50,136,189)','rgb(94,79,162)'];
 
     var dataset = [];
+    var passedQ = [];
+    var endedQ = [];
+
     var chart = {};
     console.log("Hello! Let me draw for you.");
     parseCategory();
@@ -245,14 +248,29 @@
 
     var firebase = new Firebase(db);
     firebase.child('questions').once('value', function (snap) {
-      
+
       var snap_obj = snap.exportVal();
       for(var key in snap_obj){
           if(snap_obj[key].signatures_count && snap_obj[key].post_timestamp){
              snap_obj[key].qid = key;
              dataset.push(snap_obj[key]);
+
+            //passed
+            if(snap_obj[key].signatures_count > snap_obj[key].signatures_threshold){
+                passedQ.push(snap_obj[key]);
+            }
+            //ended
+            if(snap_obj[key].deadline_timestamp < $.now()){
+                if(snap_obj[key].signatures_count < snap_obj[key].signatures_threshold){
+                    endedQ.push(snap_obj[key]);
+                }
+            }
           }
       }
+
+      $("#passedCount").text(passedQ.length);
+      $("#endedCount").text(endedQ.length);
+
       $("#qCount").text(dataset.length);
       defaultDraw();
 
@@ -280,7 +298,7 @@
       }else{
         db = "https://askkk-taichung.firebaseio.com/";
       }
-      
+
       var o_s = $("#datepicker_start").val();
       var o_e = $("#datepicker_end").val();
 
@@ -293,21 +311,24 @@
       $("#datepicker_end").val(o_e);
 
       maxY = $("input[name=maxVote]").val();
-      
+
       var selectedCat = $("#category_select").val();
-      
+
 
       dataset = [];
+      passedQ = [];
+      endedQ = [];
+
       chart = {};
       var firebase = new Firebase(db);
       firebase.child('questions').once('value', function (snap) {
-      
+
           var snap_obj = snap.exportVal();
-          
+
           for(var key in snap_obj){
               if(snap_obj[key].signatures_count && snap_obj[key].post_timestamp){
                  snap_obj[key].qid = key;
-                 
+
                  var should_includ = true;
                  if(startTimestamp){
                     if(snap_obj[key].post_timestamp < startTimestamp)
@@ -328,32 +349,58 @@
                     }else{
                        should_includ = false;
                     }
-                    
+
                  }
 
 
-                 if(should_includ)
+                 if(should_includ){
                     dataset.push(snap_obj[key]);
-                 
+                    /***********************************/
+                    //passed
+                    if(snap_obj[key].signatures_count > snap_obj[key].signatures_threshold){
+                        if(snap_obj[key].signatures_threshold === 100)
+                            console.log(key);
+                        //console.log(snap_obj[key].signatures_threshold);
+                        passedQ.push(snap_obj[key]);
+                    }
+                    //ended
+                    if(snap_obj[key].deadline_timestamp < $.now()){
+                        if(snap_obj[key].signatures_count < snap_obj[key].signatures_threshold){
+                            endedQ.push(snap_obj[key]);
+                        }
+                    }
+                    /***********************************/
+
+                 }
+
+
               }
+
+
+
           }
+
+          $("#passedCount").text(passedQ.length);
+          $("#endedCount").text(endedQ.length);
+
           $("#qCount").text(dataset.length);
+
 
 
           if(new_w && new_h && $.isNumeric(new_w) && $.isNumeric(new_h)){//both valid
             draw(new_w,new_h);
-          
+
           }else{
             defaultDraw();
             $("input[name=width]").val(Math.min(1000,$(window).width()));
             $("input[name=height]").val(600);
-          }   
+          }
       });
 
     };
 
     function draw(_w,_h){
-      
+
       var w = _w,
           h = _h,
           circle_r = Math.min(10,w/100),
@@ -388,7 +435,7 @@
           }else{
             return "black";
           }
-             
+
       };
 
       var xAxis = d3.svg.axis()
@@ -416,7 +463,7 @@
                 color:function(d,i) { return color(d,i); }
           })
          .on("mouseover",function(d){
-             
+
              //console.log("mouseover:"+d3.select(this).attr("cx"));
              var xPosition = parseFloat(d3.select(this).attr("cx"));
              var yPosition = parseFloat(d3.select(this).attr("cy"));
@@ -429,8 +476,8 @@
                .text(d.title);
              d3.select("#v_count")
                .text(d.signatures_count);
-             
-            
+
+
              d3.select("#tooltip")
                .classed("hidden",false);
 
@@ -487,7 +534,7 @@
          .call(yAxis);
 
 
-      
+
       var legend = d3.select("#legend")
                      .append("svg")
                      .attr("width",w)
@@ -508,7 +555,7 @@
                 color:function(d,i) { return "black"; },
                 class: "legend"
           });
-      
+
       legend.selectAll('text')
          .data(categoryTitles)
          .enter()
@@ -533,9 +580,9 @@
           })
          .text(function(d,i){return d.signatures_count;});
       */
-      
+
     }
-    
+
   </script>
 
   </body>
